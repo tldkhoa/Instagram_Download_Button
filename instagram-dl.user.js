@@ -10,7 +10,6 @@
 // @name:ru             Загрузчик Instagram
 // @namespace           https://github.com/y252328/Instagram_Download_Button
 // @version             1.17.19
-// @compatible          chrome
 // @description         Add the download button and the open button to download or open profile picture and media in the posts, stories, and highlights in Instagram
 // @description:zh-TW   在Instagram頁面加入下載按鈕與開啟按鈕，透過這些按鈕可以下載或開啟大頭貼與貼文、限時動態、Highlight中的照片或影片
 // @description:zh-CN   在Instagram页面加入下载按钮与开启按钮，透过这些按钮可以下载或开启大头贴与贴文、限时动态、Highlight中的照片或影片
@@ -40,7 +39,7 @@
     const disableNewUrlFetchMethod = false;
     const prefetchAndAttachLink = false; // prefetch and add link into the button elements
     const hoverToFetchAndAttachLink = true;  // fetch and add link when hover the button
-    const replaceJpegWithJpg = false;
+    const replaceJpegWithJpg = true;
     // === File name placeholders ===
     // %id% : the poster id
     // %datetime% : the media upload time
@@ -559,7 +558,7 @@
     }
 
     function findPostName(articleNode) {
-        // this grabs the username link that is visually in the author's post comment below the media 
+        // this grabs the username link that is visually in the author's post comment below the media
         // 'article section' includes the likes section and comment box
         // '+ * a' pulls the first element after the section that contains a link (comment box doesn't)
         // '[href^="/"][href$="/"]' requires the href attribute to begin and end with a slash to match a username
@@ -727,16 +726,50 @@
 
     function forceDownload(blob, filename, extension) {
         // ref: https://stackoverflow.com/questions/49474775/chrome-65-blocks-cross-origin-a-download-client-side-workaround-to-force-down
-        var a = document.createElement('a');
+        //var a = document.createElement('a');
         if (replaceJpegWithJpg) extension = extension.replace('jpeg', 'jpg');
-        a.download = filename + '.' + extension;
+        const suggestedName = filename + '.' + extension;
+        // Feature detection. The API needs to be supported
+        // and the app not run in an iframe.
+        const supportsFileSystemAccess =
+            'showSaveFilePicker' in window &&
+            (() => {
+            try {
+                return window.self === window.top;
+            } catch {
+                return false;
+            }
+            })();
+        // If the File System Access API is supported…
+        if (supportsFileSystemAccess) {
+            try {
+            // Show the file save dialog.
+            const handle = window.showSaveFilePicker({
+                suggestedName,
+            });
+            // Write the blob to the file.
+            const writable = handle.createWritable();
+            writable.write(blob);
+            writable.close();
+            return;
+            } catch (err) {
+            // Fail silently if the user has simply canceled the dialog.
+            if (err.name !== 'AbortError') {
+                console.error(err.name, err.message);
+                return;
+            }
+            }
+        }
+        // Fallback if the File System Access API is not supported…
+        // Create the blob URL.
+        var a = document.createElement('a');
+        a.download = suggestedName;
         a.href = blob;
         // For Firefox https://stackoverflow.com/a/32226068
         document.body.appendChild(a);
         a.click();
         a.remove();
     }
-
     // Current blob size limit is around 500MB for browsers
     function downloadResource(url, filename) {
         if (url.startsWith('blob:')) {
