@@ -742,33 +742,36 @@
             })();
         // If the File System Access API is supported…
         if (supportsFileSystemAccess) {
-            try {
-            // Show the file save dialog.
-            const handle = window.showSaveFilePicker({
-                suggestedName,
-            });
             // Write the blob to the file.
-            const writable = handle.createWritable();
-            writable.write(blob);
-            writable.close();
+            writeFile(suggestedName,blob).then(result => {
+                console.log("Result from writeFile function:", result);
+            }).catch(error => {
+                console.error("Error from writeFile function:", error);
+            });
             return;
-            } catch (err) {
-            // Fail silently if the user has simply canceled the dialog.
-            if (err.name !== 'AbortError') {
-                console.error(err.name, err.message);
-                return;
-            }
-            }
         }
         // Fallback if the File System Access API is not supported…
         // Create the blob URL.
         var a = document.createElement('a');
         a.download = suggestedName;
-        a.href = blob;
+        a.href = window.URL.createObjectURL(blob);
         // For Firefox https://stackoverflow.com/a/32226068
         document.body.appendChild(a);
         a.click();
         a.remove();
+    }
+
+    async function writeFile(suggestedName,contents) {
+        // Show the file save dialog.
+        const handle = await window.showSaveFilePicker({suggestedName});
+        // Create a FileSystemWritableFileStream to write to.
+        const writable = await handle.createWritable();
+
+        // Write the contents of the file to the stream.
+        await writable.write(contents);
+
+        // Close the file and write the contents to disk.
+        await writable.close();
     }
     // Current blob size limit is around 500MB for browsers
     function downloadResource(url, filename) {
@@ -795,8 +798,7 @@
             .then(response => response.blob())
             .then(blob => {
                 const extension = blob.type.split('/').pop();
-                let blobUrl = window.URL.createObjectURL(blob);
-                forceDownload(blobUrl, filename, extension);
+                forceDownload(blob, filename, extension);
             })
             .catch(e => console.error(e));
     }
